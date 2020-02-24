@@ -11,28 +11,28 @@
 ***************************************************************************
 """
 
-from qgis.PyQt.QtCore import QCoreApplication
+#from PyQt5.QtCore import QVariant
+from qgis.PyQt.QtCore import QCoreApplication, QVariant
 from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
                        QgsProcessingException,
                        QgsProcessingAlgorithm,
-                       QgsProcessingParameterFeatureSource,
-                       QgsProcessingParameterFeatureSink)
-from qgis import processing
+                       QgsProcessingParameterRasterLayer,
+                       QgsProcessingParameterBand,
+                       QgsProcessingParameterFeatureSink,
+                       QgsProcessingParameterCrs,
+                       QgsRasterBlock,
+                       QgsFields,
+                       QgsField,
+                       QgsPointXY)
+from qgis import processing#, WKBPoint
 
+from talus import morse
 
 class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
     """
-    This is an example algorithm that takes a vector layer and
-    creates a new identical one.
-
-    It is meant to be used as an example of how to create your own
-    algorithms and explain methods and variables used to do it. An
-    algorithm like this will be available in all elements, and there
-    is not need for additional work.
-
-    All Processing algorithms should extend the QgsProcessingAlgorithm
-    class.
+    This is an implementation of topographical prominence via
+    topological persistence using the Talus library.
     """
 
     # Constants used to refer to parameters and outputs. They will be
@@ -41,6 +41,7 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
 
     INPUT = 'INPUT'
     OUTPUT = 'OUTPUT'
+    TARGET_CRS = 'TARGET_CRS'
 
     def tr(self, string):
         """
@@ -59,21 +60,21 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
         lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'myscript'
+        return 'persistence'
 
     def displayName(self):
         """
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr('My Script')
+        return self.tr('Morse Persistence')
 
     def group(self):
         """
         Returns the name of the group this algorithm belongs to. This string
         should be localised.
         """
-        return self.tr('Example scripts')
+        return self.tr('Talus')
 
     def groupId(self):
         """
@@ -83,7 +84,7 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
         contain lowercase alphanumeric characters only and no spaces or other
         formatting characters.
         """
-        return 'examplescripts'
+        return 'talus'
 
     def shortHelpString(self):
         """
@@ -91,7 +92,7 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
         should provide a basic description about what the algorithm does and the
         parameters and outputs associated with it..
         """
-        return self.tr("Example algorithm short description")
+        return self.tr("Topographical Prominence on DEM")
 
     def initAlgorithm(self, config=None):
         """
@@ -102,10 +103,10 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
         # We add the input vector features source. It can have any kind of
         # geometry.
         self.addParameter(
-            QgsProcessingParameterFeatureSource(
+            QgsProcessingParameterRasterLayer( #QgsProcessingParameterBand
                 self.INPUT,
                 self.tr('Input layer'),
-                [QgsProcessing.TypeVectorAnyGeometry]
+                [QgsProcessing.TypeRaster]
             )
         )
 
@@ -118,16 +119,23 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
                 self.tr('Output layer')
             )
         )
+        #parameterAsCrs
+        self.addParameter(
+            QgsProcessingParameterCrs(
+                self.TARGET_CRS,
+                self.tr('Target CRS')
+            )
+        )
 
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
         """
 
-        # Retrieve the feature source and sink. The 'dest_id' variable is used
+        # The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
-        source = self.parameterAsSource(
+        source = self.parameterAsRasterLayer(
             parameters,
             self.INPUT,
             context
@@ -140,17 +148,28 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
         if source is None:
             raise QgsProcessingException(self.invalidSourceError(parameters, self.INPUT))
 
+        your_fields = QgsFields()
+        your_fields.append(QgsField('prmnc', QVariant.Int))
+
+        out_crs = self.parameterAsCrs(
+            parameters,
+            self.TARGET_CRS,
+            context
+        )
+
         (sink, dest_id) = self.parameterAsSink(
             parameters,
             self.OUTPUT,
             context,
-            source.fields(),
-            source.wkbType(),
-            source.sourceCrs()
+            your_fields,
+            QgsPointXY,
+            #FIXME: TypeError: QgsProcessingAlgorithm.parameterAsSink():
+            #       argument 5 has unexpected type 'sip.wrappertype'
+            out_crs
         )
 
         # Send some information to the user
-        feedback.pushInfo('CRS is {}'.format(source.sourceCrs().authid()))
+        feedback.pushInfo('CRS is {}'.format(source.crs().authid()))
 
         # If sink was not created, throw an exception to indicate that the algorithm
         # encountered a fatal error. The exception text can be any string, but in this
@@ -161,36 +180,47 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
 
         # Compute the number of steps to display within the progress bar and
         # get features from source
-        total = 100.0 / source.featureCount() if source.featureCount() else 0
-        features = source.getFeatures()
 
-        for current, feature in enumerate(features):
-            # Stop the algorithm if cancel button has been clicked
-            if feedback.isCanceled():
-                break
+        provider = source.dataProvider()
 
-            # Add a feature in the sink
-            sink.addFeature(feature, QgsFeatureSink.FastInsert)
+        extent = provider.extent()
 
-            # Update the progress bar
-            feedback.setProgress(int(current * total))
+        rows = source.height()
+        cols = source.width()
+
+        block = provider.block(1, extent, cols, rows)
+
+        total = rows * cols
+        print(total)
+        raise QgsProcessingException('lol')
+
+        # for current, feature in enumerate(features):
+        #     # Stop the algorithm if cancel button has been clicked
+        #     if feedback.isCanceled():
+        #         break
+        #
+        #     # Add a feature in the sink
+        #     sink.addFeature(feature, QgsFeatureSink.FastInsert)
+        #
+        #     # Update the progress bar
+        #     feedback.setProgress(int(current * total))
 
         # To run another Processing algorithm as part of this algorithm, you can use
         # processing.run(...). Make sure you pass the current context and feedback
         # to processing.run to ensure that all temporary layer outputs are available
         # to the executed algorithm, and that the executed algorithm can send feedback
         # reports to the user (and correctly handle cancellation and progress reports!)
-        if False:
-            buffered_layer = processing.run("native:buffer", {
-                'INPUT': dest_id,
-                'DISTANCE': 1.5,
-                'SEGMENTS': 5,
-                'END_CAP_STYLE': 0,
-                'JOIN_STYLE': 0,
-                'MITER_LIMIT': 2,
-                'DISSOLVE': False,
-                'OUTPUT': 'memory:'
-            }, context=context, feedback=feedback)['OUTPUT']
+        # if False:
+        #     buffered_layer = processing.run("native:buffer", {
+        #         'INPUT': dest_id,
+        #         'DISTANCE': 1.5,
+        #         'SEGMENTS': 5,
+        #         'END_CAP_STYLE': 0,
+        #         'JOIN_STYLE': 0,
+        #         'MITER_LIMIT': 2,
+        #         'DISSOLVE': False,
+        #         'OUTPUT': 'memory:'
+        #     }, context=context, feedback=feedback)['OUTPUT']
 
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
