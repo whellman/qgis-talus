@@ -21,10 +21,12 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterBand,
                        QgsProcessingParameterFeatureSink,
                        QgsProcessingParameterCrs,
+                       QgsCoordinateReferenceSystem,
                        QgsRasterBlock,
                        QgsFields,
                        QgsField,
-                       QgsPointXY)
+                       QgsWkbTypes
+                       )
 from qgis import processing#, WKBPoint
 
 from talus import morse
@@ -157,14 +159,16 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
             context
         )
 
+        print(out_crs)
+        print(type(out_crs))
+        print(dir(out_crs))
+
         (sink, dest_id) = self.parameterAsSink(
             parameters,
             self.OUTPUT,
             context,
             your_fields,
-            QgsPointXY,
-            #FIXME: TypeError: QgsProcessingAlgorithm.parameterAsSink():
-            #       argument 5 has unexpected type 'sip.wrappertype'
+            QgsWkbTypes.Type.Point,
             out_crs
         )
 
