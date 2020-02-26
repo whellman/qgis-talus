@@ -201,6 +201,9 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
         block = provider.block(1, extent, cols, rows)
 
         total = rows * cols
+        print(total)
+        # test_values = set()
+
         nodes = []
 
         biggest_value = 0
@@ -208,6 +211,7 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
             for y in range(height):
                 idx = x + width * y
                 value = block.value(x, y)
+                # test_values.add(value)
                 if value > biggest_value:
                     biggest_value = value
                 my_node = morse.MorseNode(identifier=idx, value=value)
@@ -243,7 +247,16 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
                     imgraph.add_edge(my_node, neighbor_node)
 
         number_of_nines = len(str(int(biggest_value)))
+        print(biggest_value)
+        print(type(biggest_value))
         infinity_replacement_value = '9' * number_of_nines
+        assert number_of_nines < 6
+        print(infinity_replacement_value)
+
+        # print('----------------')
+        # print(sorted(test_values))
+        # print('----------------')
+
 
         result = morse.persistence(imgraph)
         for x in range(width):
@@ -255,7 +268,6 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
                 # else:
                     # imarray[y, x] = int(result[idx])
 
-        print(total)
         raise QgsProcessingException('lol')
 
         # for current, feature in enumerate(features):
