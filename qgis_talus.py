@@ -30,6 +30,7 @@ from qgis.core import (QgsProcessing,
 from qgis import processing#, WKBPoint
 import networkx as nx
 from talus import morse
+import pickle
 
 class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
     """
@@ -210,7 +211,7 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
         for x in range(width):
             for y in range(height):
                 idx = x + width * y
-                value = block.value(x, y)
+                value = block.value(y, x)
                 # test_values.add(value)
                 if value > biggest_value:
                     biggest_value = value
@@ -221,52 +222,52 @@ class ExampleProcessingAlgorithm(QgsProcessingAlgorithm):
                 if(x > 0):
                     # add edge of column left/less
                     neighbor_idx = (x - 1) + width * y
-                    neighbor_value = block.value((x - 1), y) # imarray[y, (x - 1)]
+                    neighbor_value = block.value(y, (x - 1)) # imarray[y, (x - 1)]
                     neighbor_node = morse.MorseNode(identifier=neighbor_idx, value=neighbor_value)
                     imgraph.add_edge(my_node, neighbor_node)
                 # if we're not on the maximum column,
                 if(x < (width - 1)):
                     # add edge of column right/greater
                     neighbor_idx = (x + 1) + width * y
-                    neighbor_value = block.value((x + 1), y) # imarray[y, (x + 1)]
+                    neighbor_value = block.value(y, (x + 1)) # imarray[y, (x + 1)]
                     neighbor_node = morse.MorseNode(identifier=neighbor_idx, value=neighbor_value)
                     imgraph.add_edge(my_node, neighbor_node)
                 # if we're not on the leastmost row,
                 if(y > 0):
                     # add edge of row above/less
                     neighbor_idx = x + width * (y - 1)
-                    neighbor_value = block.value(x, (y - 1)) # imarray[(y - 1), x]
+                    neighbor_value = block.value((y - 1), x) # imarray[(y - 1), x]
                     neighbor_node = morse.MorseNode(identifier=neighbor_idx, value=neighbor_value)
                     imgraph.add_edge(my_node, neighbor_node)
                 # if we're not on the maxmimum row,
                 if(y < (height - 1)):
                     # add edge of row below/greater
                     neighbor_idx = x + width * (y + 1)
-                    neighbor_value = block.value(x, (y + 1)) # imarray[(y + 1), x]
+                    neighbor_value = block.value((y + 1), x) # imarray[(y + 1), x]
                     neighbor_node = morse.MorseNode(identifier=neighbor_idx, value=neighbor_value)
                     imgraph.add_edge(my_node, neighbor_node)
 
-        number_of_nines = len(str(int(biggest_value)))
-        print(biggest_value)
-        print(type(biggest_value))
-        infinity_replacement_value = '9' * number_of_nines
-        assert number_of_nines < 6
-        print(infinity_replacement_value)
+        print("pickling graph")
+        pickleF = open(('/Users/weshellman/test_nxgraph.pickle'), 'wb')
+        pickle.dump(imgraph, pickleF)
 
-        # print('----------------')
-        # print(sorted(test_values))
-        # print('----------------')
-
-
+        print("running persistence")
         result = morse.persistence(imgraph)
-        for x in range(width):
-            for y in range(height):
-                idx = x + width * y
-                if result[idx] == float('inf'):
-                    # imarray[y, x] = infinity_replacement_value
-                    print('Found highest prominence at ' + str(x) + ', ' + str(y))
-                # else:
-                    # imarray[y, x] = int(result[idx])
+        # print(result.descending_complex.compute_cells_at_lifetime(0))
+        for f in result.descending_complex.filtration:
+            print(result.descending_complex.compute_cells_at_lifetime(f.lifetime))
+        for f in result.descending_complex.filtration:
+            print(f)
+
+
+        # for x in range(width):
+        #     for y in range(height):
+        #         idx = x + width * y
+        #         if result[idx] == float('inf'):
+        #             # imarray[y, x] = infinity_replacement_value
+        #             print('Found highest prominence at ' + str(x) + ', ' + str(y))
+        #         # else:
+        #             # imarray[y, x] = int(result[idx])
 
         raise QgsProcessingException('lol')
 
